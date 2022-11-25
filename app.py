@@ -7,6 +7,7 @@ from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.async_app import AsyncApp
 
 from commands.wallpaper import wallpaper_command_handler
+from db.scheme import init_database
 
 SLACK_TOKEN = os.environ.get('SLACK_TOKEN')
 SIGNING_SECRET = os.environ.get('SIGNING_SECRET')
@@ -59,16 +60,16 @@ async def handle_ping_command(ack, respond, command):
 api = FastAPI()
 
 
-@api.post("/slack/events")
+@api.post("/slack/{path_:path}")
 async def endpoint(req: Request):
     """Base event endpoint handler."""
     return await app_handler.handle(req)
 
 
-@api.post("/slack/command/{command:str}")
-async def commands_endpoint(req: Request, command: str):
-    """Base command endpoint handler."""
-    return await app_handler.handle(req)
+# @api.post("/slack/command/{command:str}")
+# async def commands_endpoint(req: Request, command: str):
+#     """Base command endpoint handler."""
+#     return await app_handler.handle(req)
 
 
 @api.get('/ping')
@@ -78,4 +79,5 @@ def ping():
 
 
 if __name__ == "__main__":
+    init_database('db.sqlite3')
     uvicorn.run('app:api', host='0.0.0.0', reload=True)
