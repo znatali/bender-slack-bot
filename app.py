@@ -22,34 +22,50 @@ async def handle_app_mentions(body, say, logger):
 
 
 @app.command("/echo")
-def repeat_text(ack, respond, command):
-    # Acknowledge command request
-    ack()
-    respond(f"{command['text']}")
+async def repeat_text(ack, respond, command):
+    """Slack '/echo' command handler."""
+    await ack()
+    await respond(f"{command['command']} {command.get('text', '')}")
+
+
+@app.command("/new_wallpaper")
+async def get_new_wallpaper(ack, respond, command):
+    await ack()
+    await respond(f"Here your new wallpaper")
 
 
 @app.command('/ping')
 async def handle_ping_command(ack, respond, command):
-    print(ack, respond, command)
+    """Slack '/ping' command handler."""
+    await ack()
     await respond("Pong")
 
 
-@app.event("message")
-async def handle_message(message, say):
-    print(message)
-    await say("Bender is here")
+# @app.event("message")
+# async def handle_message(message, say):
+#     print(message)
+#     await say("Bender is here")
 
 
+# Backend API
 api = FastAPI()
 
 
 @api.post("/slack/events")
 async def endpoint(req: Request):
+    """Base event endpoint handler."""
+    return await app_handler.handle(req)
+
+
+@api.post("/slack/command/{command:str}")
+async def commands_endpoint(req: Request, command: str):
+    """Base command endpoint handler."""
     return await app_handler.handle(req)
 
 
 @api.get('/ping')
 def ping():
+    """Ping Pong endpoint of backend."""
     return {'message': 'pong'}
 
 
