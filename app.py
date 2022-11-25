@@ -21,10 +21,17 @@ async def handle_app_mentions(body, say, logger):
     await say("What's up?")
 
 
-@app.command('ping')
-async def handle_ping_command(data, say):
-    print(data)
-    await say("Pong")
+@app.command("/echo")
+def repeat_text(ack, respond, command):
+    # Acknowledge command request
+    ack()
+    respond(f"{command['text']}")
+
+
+@app.command('/ping')
+async def handle_ping_command(ack, respond, command):
+    print(ack, respond, command)
+    await respond("Pong")
 
 
 @app.event("message")
