@@ -1,43 +1,44 @@
+import logging
 import os
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi_slackeventsapi import SlackEventManager
-from slack_sdk import WebClient
+from fastapi import FastAPI, Request
+from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
+from slack_bolt.async_app import AsyncApp
 
-SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
-SIGNING_SECRET = os.environ.get("SIGNING_SECRET")
+SLACK_TOKEN = os.environ.get('SLACK_TOKEN')
+SIGNING_SECRET = os.environ.get('SIGNING_SECRET')
 
-app = FastAPI()
-slack_event_manger = SlackEventManager(singing_secret=SIGNING_SECRET,
-                                       endpoint='/slack/events/',
-                                       app=app)
+logging.basicConfig(level=logging.DEBUG)
 
-client = WebClient(token=SLACK_TOKEN)
+app = AsyncApp(token=SLACK_TOKEN, signing_secret=SIGNING_SECRET)
+app_handler = AsyncSlackRequestHandler(app)
 
 
-@app.get('/ping')
-def ping_handler():
-    return {"message": "pong"}
+@app.event("app_mention")
+async def handle_app_mentions(body, say, logger):
+    logger.info(body)
+    await say("What's up?")
 
 
-@slack_event_manger.on('message')
-def message(payload):
-    print(payload)
-    event = payload.get('event', {})
-    channel_id = event.get('channel')
-    user_id = event.get('user')
-    text = event.get('text')
-
-    if text == "hi":
-        client.chat_postMessage(channel=channel_id, text="Hello")
+@app.event("message")
+async def handle_message(message, say):
+    print(message)
+    await say("Bender is here")
 
 
-@slack_event_manger.on('reaction_added')
-async def reaction_added(event_data):
-    emoji = event_data['event']['reaction']
-    print(emoji)
+api = FastAPI()
+
+
+@api.post("/slack/events")
+async def endpoint(req: Request):
+    return await app_handler.handle(req)
+
+
+@api.get('/ping')
+def ping():
+    return {'message': 'pong'}
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host='0.0.0.0')
+    uvicorn.run('app:api', host='0.0.0.0', reload=True)
