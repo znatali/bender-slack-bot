@@ -1,6 +1,6 @@
 import os
 
-import slack
+from slack_sdk import WebClient
 import uvicorn
 from fastapi import FastAPI
 from fastapi_slackeventsapi import SlackEventManager
@@ -13,7 +13,7 @@ slack_event_manger = SlackEventManager(singing_secret=SIGNING_SECRET,
                                        endpoint='/slack/events',
                                        app=app)
 
-client = slack.WebClient(token=SLACK_TOKEN)
+client = WebClient(token=SLACK_TOKEN)
 
 
 @app.get('/ping')
