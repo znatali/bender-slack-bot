@@ -10,7 +10,7 @@ SIGNING_SECRET = os.environ.get("SIGNING_SECRET")
 
 app = FastAPI()
 slack_event_manger = SlackEventManager(singing_secret=SIGNING_SECRET,
-                                       endpoint='/slack/events',
+                                       endpoint='/slack/events/',
                                        app=app)
 
 client = WebClient(token=SLACK_TOKEN)
