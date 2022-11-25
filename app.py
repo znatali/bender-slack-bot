@@ -26,6 +26,13 @@ async def handle_app_mentions(body, say, logger):
     await say("What's up?")
 
 
+@app.command("/echo")
+async def repeat_text(ack, respond, command):
+    """Slack '/echo' command handler."""
+    await ack()
+    await respond(f"{command['command']} {command.get('text', '')}")
+
+
 # todo move to managers
 queue_picture_query_shared = queue.Queue()
 picture_results_shared = {}
