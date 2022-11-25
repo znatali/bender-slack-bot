@@ -5,7 +5,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.async_app import AsyncApp
-
+from commands.survey import leave_report, regular_report
 from commands.wallpaper import wallpaper_command_handler
 from db.scheme import init_database, get_cursor
 from config import DB_PATH
@@ -104,74 +104,20 @@ async def handle_ping_command(ack, respond, command):
 @app.view("")
 async def handle_submission(ack, body, client, view, logger):
     # Assume there's an input block with `input_c` as the block_id and `dreamy_input`
-    name = body["user"]["name"]
-    views_values = view["state"]["values"]
-    mood = views_values['input_mode']['mood_view_id']['selected_option']['text']['text']
-    yesterday_dids = views_values['input_ytd']['yesterday_view_id']['value']
-    today_dids = views_values['input_td']['today_view_id']['value']
     # Acknowledge the view_submission request and close the modal
     await ack()
-    # Do whatever you want with the input data - here we're saving it to a DB
-    # then sending the user a verification of their submission
 
-    # Message to send user
-    blocks = [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": f"Bender {name} reports:",
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Done:*",
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "plain_text",
-                "text": f"{yesterday_dids}",
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*In a mood  {mood}  to do:*",
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "plain_text",
-                "text": f"{today_dids}",
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Motivation picture*",
-            }
-        },
-        {
-            "type": "image",
-            "title": {
-                "type": "plain_text",
-                "text": "I Need a Marg",
-            },
-            "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
-            "alt_text": "marg"
-        }
-    ]
+    print("views", view["state"]["values"])
+    name = body["user"]["name"]
+    views_values = view["state"]["values"]
+    if 'reason_view_id' in views_values['input_mode']:
+        blocks =leave_report(views_values, name)
+    else:
+        blocks =regular_report(views_values, name)
 
     # Message the user
     try:
-       await client.chat_postMessage(channel='#testreports', blocks=blocks)
+        await client.chat_postMessage(channel='#testreports', blocks=blocks)
     except e:
         logger.exception(f"Failed to post a message {e}")
 
@@ -193,13 +139,6 @@ async def open_modal(ack, shortcut, client):
                 "text": "Submit",
             },
             "blocks": [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "Bender Report\n\n"
-                    }
-                },
                 {
                     "type": "section",
                     "block_id": "input_mode",
@@ -279,6 +218,101 @@ async def open_modal(ack, shortcut, client):
         }
     )
 
+
+@app.shortcut("leave_modal")
+async def leave_modal(ack, shortcut, client):
+    # Acknowledge the shortcut request
+    await ack()
+    # Call the views_open method using the built-in WebClient
+    await client.views_open(
+        trigger_id=shortcut["trigger_id"],
+        # A simple view payload for a modal
+        view={
+            "type": "modal",
+            "title": {"type": "plain_text", "text": "Bender Leave"},
+            "close": {"type": "plain_text", "text": "Close"},
+            "submit": {
+                "type": "plain_text",
+                "text": "Submit",
+            },
+            "blocks": [
+                {
+                    "type": "section",
+                    "block_id": "input_mode",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*What you're leaving for?*"
+                    },
+                    "accessory": {
+                        "type": "static_select",
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Select an item",
+                            "emoji": True
+                        },
+                        "options": [
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Sick 🤧",
+                                    "emoji": True
+                                },
+                                "value": "value-0"
+                            },
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Day off 😎",
+                                    "emoji": True
+                                },
+                                "value": "value-1"
+                            },
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Vacation 🤠",
+                                    "emoji": True
+                                },
+                                "value": "value-2"
+                            }
+                        ],
+                        "action_id": "reason_view_id"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "How long you're planing be off?"
+                    }
+                },
+                {
+                    "type": "actions",
+                    "block_id": "input_datas",
+                    "elements": [
+                        {
+                            "type": "datepicker",
+                            "initial_date": "1990-04-28",
+                            "placeholder": {
+                                "type": "plain_text",
+                                "text": "From",
+                            },
+                            "action_id": "actionId-0"
+                        },
+                        {
+                            "type": "datepicker",
+                            "initial_date": "1990-04-28",
+                            "placeholder": {
+                                "type": "plain_text",
+                                "text": "To",
+                            },
+                            "action_id": "actionId-1"
+                        }
+                    ]
+                },
+            ]
+        }
+    )
 
 # Backend API
 api = FastAPI()
