@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.async_app import AsyncApp
 
+from commands.wallpaper import wallpaper_command_handler
+
 SLACK_TOKEN = os.environ.get('SLACK_TOKEN')
 SIGNING_SECRET = os.environ.get('SIGNING_SECRET')
 
@@ -31,7 +33,13 @@ async def repeat_text(ack, respond, command):
 @app.command("/new_wallpaper")
 async def get_new_wallpaper(ack, respond, command):
     await ack()
-    await respond(f"Here your new wallpaper")
+    picture_url = await wallpaper_command_handler()
+    picture_block = [{
+        "type": "image",
+        "image_url": picture_url,
+        "alt_text": "wallpaper"
+    }]
+    await respond(blocks=picture_block)
 
 
 @app.command('/ping')
