@@ -101,10 +101,183 @@ async def handle_ping_command(ack, respond, command):
     await respond("Pong")
 
 
-# @app.event("message")
-# async def handle_message(message, say):
-#     print(message)
-#     await say("Bender is here")
+@app.view("")
+async def handle_submission(ack, body, client, view, logger):
+    # Assume there's an input block with `input_c` as the block_id and `dreamy_input`
+    name = body["user"]["name"]
+    views_values = view["state"]["values"]
+    mood = views_values['input_mode']['mood_view_id']['selected_option']['text']['text']
+    yesterday_dids = views_values['input_ytd']['yesterday_view_id']['value']
+    today_dids = views_values['input_td']['today_view_id']['value']
+    # Acknowledge the view_submission request and close the modal
+    await ack()
+    # Do whatever you want with the input data - here we're saving it to a DB
+    # then sending the user a verification of their submission
+
+    # Message to send user
+    blocks = [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": f"Bender {name} reports:",
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Done:*",
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "plain_text",
+                "text": f"{yesterday_dids}",
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*In a mood  {mood}  to do:*",
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "plain_text",
+                "text": f"{today_dids}",
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Motivation picture*",
+            }
+        },
+        {
+            "type": "image",
+            "title": {
+                "type": "plain_text",
+                "text": "I Need a Marg",
+            },
+            "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
+            "alt_text": "marg"
+        }
+    ]
+
+    # Message the user
+    try:
+       await client.chat_postMessage(channel='#testreports', blocks=blocks)
+    except e:
+        logger.exception(f"Failed to post a message {e}")
+
+
+@app.shortcut("open_modal_report")
+async def open_modal(ack, shortcut, client):
+    # Acknowledge the shortcut request
+    await ack()
+    # Call the views_open method using the built-in WebClient
+    await client.views_open(
+        trigger_id=shortcut["trigger_id"],
+        # A simple view payload for a modal
+        view={
+            "type": "modal",
+            "title": {"type": "plain_text", "text": "Bender Report"},
+            "close": {"type": "plain_text", "text": "Close"},
+            "submit": {
+                "type": "plain_text",
+                "text": "Submit",
+            },
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "Bender Report\n\n"
+                    }
+                },
+                {
+                    "type": "section",
+                    "block_id": "input_mode",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*How are you today?*"
+                    },
+                    "accessory": {
+                        "type": "static_select",
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Select an item",
+                            "emoji": True
+                        },
+                        "options": [
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "🙂",
+                                    "emoji": True
+                                },
+                                "value": "value-0"
+                            },
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "🙃",
+                                    "emoji": True
+                                },
+                                "value": "value-1"
+                            },
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "🫠",
+                                    "emoji": True
+                                },
+                                "value": "value-2"
+                            }
+                        ],
+                        "action_id": "mood_view_id"
+                    }
+                },
+                {
+                    "type": "input",
+                    "block_id": "input_ytd",
+                    "label": {
+                        "type": "plain_text",
+                        "text": "What you done yesterday?"
+                    },
+                    "element": {
+                        "type": "plain_text_input",
+                        "action_id": "yesterday_view_id",
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Enter text"
+                        }
+                    }
+                },
+                {
+                    "type": "input",
+                    "block_id": "input_td",
+                    "label": {
+                        "type": "plain_text",
+                        "text": "What you're going do today?"
+                    },
+                    "element": {
+                        "type": "plain_text_input",
+                        "action_id": "today_view_id",
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Enter text"
+                        }
+                    }
+                }
+            ]
+        }
+    )
 
 
 # Backend API
@@ -121,6 +294,11 @@ async def endpoint(req: Request):
 # async def commands_endpoint(req: Request, command: str):
 #     """Base command endpoint handler."""
 #     return await app_handler.handle(req)
+
+@api.post("/slack/interactive-endpoint/{command:str}")
+async def interactives_endpoint(req: Request, command: str):
+    """Base command endpoint handler."""
+    return await app_handler.handle(req)
 
 
 @api.get('/ping')
