@@ -21,6 +21,12 @@ async def handle_app_mentions(body, say, logger):
     await say("What's up?")
 
 
+@app.command('ping')
+async def handle_ping_command(data, say):
+    print(data)
+    await say("Pong")
+
+
 @app.event("message")
 async def handle_message(message, say):
     print(message)
