@@ -1,8 +1,11 @@
+import asyncio
+import json
 import logging
 import os
+import queue
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.async_app import AsyncApp
 
@@ -23,11 +26,9 @@ async def handle_app_mentions(body, say, logger):
     await say("What's up?")
 
 
-@app.command("/echo")
-async def repeat_text(ack, respond, command):
-    """Slack '/echo' command handler."""
-    await ack()
-    await respond(f"{command['command']} {command.get('text', '')}")
+# todo move to managers
+queue_picture_query_shared = queue.Queue()
+picture_results_shared = {}
 
 
 @app.command("/new_wallpaper")
@@ -57,6 +58,33 @@ async def handle_ping_command(ack, respond, command):
 
 # Backend API
 api = FastAPI()
+
+
+async def get_picture(query: str) -> str:
+    queue_picture_query_shared.put(query)
+    await asyncio.sleep(20)
+    while query not in picture_results_shared:
+        await asyncio.sleep(3)
+    return picture_results_shared.pop(query)
+
+
+@api.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        msg = await websocket.receive_text()
+        if msg == "get_query":
+            if queue_picture_query_shared.empty():
+                await websocket.send_text('')
+                continue
+            res = queue_picture_query_shared.get()
+            await websocket.send_text(res)
+            continue
+
+        msg = json.loads(msg)
+        query = msg['query']
+        img = msg['img']
+        picture_results_shared[query] = img
 
 
 @api.post("/slack/events")
