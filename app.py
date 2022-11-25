@@ -1,9 +1,9 @@
 import os
 
-from slack_sdk import WebClient
 import uvicorn
 from fastapi import FastAPI
 from fastapi_slackeventsapi import SlackEventManager
+from slack_sdk import WebClient
 
 SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
 SIGNING_SECRET = os.environ.get("SIGNING_SECRET")
