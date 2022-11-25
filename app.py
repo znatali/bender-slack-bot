@@ -16,6 +16,10 @@ slack_event_manger = SlackEventManager(singing_secret=SIGNING_SECRET,
 client = slack.WebClient(token=SLACK_TOKEN)
 
 
+@app.get('/ping')
+def ping_handler():
+    return {"message": "pong"}
+
 @slack_event_manger.on('message')
 def message(payload):
     print(payload)
