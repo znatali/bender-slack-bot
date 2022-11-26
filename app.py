@@ -1,14 +1,19 @@
+import asyncio
+import base64
 import logging
 import os
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.async_app import AsyncApp
+from slack_sdk.web.async_client import AsyncWebClient
+from starlette.websockets import WebSocketDisconnect
+
 from commands.survey import leave_report, regular_report
 from commands.wallpaper import wallpaper_command_handler
-from db.scheme import init_database, get_cursor
 from config import DB_PATH
+from db.scheme import init_database, get_cursor
 
 SLACK_TOKEN = os.environ.get('SLACK_TOKEN')
 SIGNING_SECRET = os.environ.get('SIGNING_SECRET')
@@ -17,6 +22,9 @@ logging.basicConfig(level=logging.DEBUG)
 
 app = AsyncApp(token=SLACK_TOKEN, signing_secret=SIGNING_SECRET)
 app_handler = AsyncSlackRequestHandler(app)
+
+pictures_queue = asyncio.Queue()
+results_queue = asyncio.Queue()
 
 
 @app.event("app_mention")
@@ -65,7 +73,7 @@ async def delete_secret_command(ack, respond, command):
 
 
 @app.command("/secret_list")
-async def delete_secret_command(ack, respond, command):
+async def list_secret_command(ack, respond, command):
     await ack()
     cur = get_cursor(DB_PATH)
     cur.execute("SELECT key, value from secrets where chat_id=(?)", (command['channel_id'],))
@@ -94,6 +102,25 @@ async def get_new_wallpaper(ack, respond, command):
     await respond(blocks=picture_block)
 
 
+@app.command('/diffusion_check')
+async def handle_diffusion_check_command(ack, respond, command, client):
+    """Slack '/diffusion_check' command handler."""
+    await ack()
+    client: AsyncWebClient
+    query = command.get("text")
+    if not query:
+        await respond("query is empty")
+    await pictures_queue.put({"query": query})
+    picture_data = await results_queue.get()
+    picture_name = picture_data['picture_name']
+    await client.files_upload_v2(
+        channel=command.get('channel_id'),
+        title=query,
+        filename=picture_name,
+        request_file_info=False,
+        file=base64.b64decode(picture_data['picture_base64']),
+    )
+
 @app.command('/ping')
 async def handle_ping_command(ack, respond, command):
     """Slack '/ping' command handler."""
@@ -111,14 +138,14 @@ async def handle_submission(ack, body, client, view, logger):
     name = body["user"]["name"]
     views_values = view["state"]["values"]
     if 'reason_view_id' in views_values['input_mode']:
-        blocks =leave_report(views_values, name)
+        blocks = leave_report(views_values, name)
     else:
-        blocks =regular_report(views_values, name)
+        blocks = regular_report(views_values, name)
 
     # Message the user
     try:
         await client.chat_postMessage(channel='#testreports', blocks=blocks)
-    except e:
+    except Exception as e:
         logger.exception(f"Failed to post a message {e}")
 
 
@@ -139,6 +166,13 @@ async def open_modal(ack, shortcut, client):
                 "text": "Submit",
             },
             "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "Bender Report\n\n"
+                    }
+                },
                 {
                     "type": "section",
                     "block_id": "input_mode",
@@ -314,6 +348,7 @@ async def leave_modal(ack, shortcut, client):
         }
     )
 
+
 # Backend API
 api = FastAPI()
 
@@ -339,6 +374,27 @@ async def interactives_endpoint(req: Request, command: str):
 def ping():
     """Ping-Pong endpoint of backend."""
     return {'message': 'pong'}
+
+
+@api.websocket_route('/ws/picture_service')
+async def picture_service_handle(websocket: WebSocket):
+    await websocket.accept()
+    print('websocket connected')
+    while True:
+        try:
+            message: dict = await websocket.receive_json()
+
+            if message.get('service_name') == 'picture_generator' and message.get('event') == 'request_picture':
+                picture_request = await pictures_queue.get()
+                await websocket.send_json(picture_request)
+
+            if message.get('service_name') == 'picture_generator' and message.get('event') == 'response_picture':
+                picture_data = message.get('picture_data')
+                await results_queue.put(picture_data)
+                await websocket.send_json({'ok': True})
+        except WebSocketDisconnect as exc:
+            print('disconnected websocket')
+            break
 
 
 if __name__ == "__main__":
