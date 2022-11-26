@@ -11,6 +11,8 @@ from slack_sdk.web.async_client import AsyncWebClient
 from starlette.websockets import WebSocketDisconnect
 
 from commands.survey import leave_report, regular_report
+from blocks.leave_modal import LEAVE_MODAL
+from blocks.report_modal import REPORT_MODAL
 from commands.wallpaper import wallpaper_command_handler
 from config import DB_PATH
 from db.scheme import init_database, get_cursor
@@ -121,11 +123,24 @@ async def handle_diffusion_check_command(ack, respond, command, client):
         file=base64.b64decode(picture_data['picture_base64']),
     )
 
+
 @app.command('/ping')
 async def handle_ping_command(ack, respond, command):
     """Slack '/ping' command handler."""
     await ack()
     await respond("Pong")
+
+async def get_motivational_picture(client, query, picture_data):
+
+    await client.files_upload_v2(
+        channel='C04C8GQ680N',
+        channel_id='C04C8GQ680N',
+        title=query,
+        filename=picture_data['picture_name'],
+        request_file_info=False,
+        file=base64.b64decode(picture_data['picture_base64']),
+    )
+
 
 
 @app.view("")
@@ -134,19 +149,25 @@ async def handle_submission(ack, body, client, view, logger):
     # Acknowledge the view_submission request and close the modal
     await ack()
 
-    print("views", view["state"]["values"])
     name = body["user"]["name"]
     views_values = view["state"]["values"]
+
     if 'reason_view_id' in views_values['input_mode']:
+        query_pic = views_values['input_mode']['reason_view_id']['selected_option']['text']['text']
         blocks = leave_report(views_values, name)
     else:
+        query_pic = views_values['input_td']['today_view_id']['value']
         blocks = regular_report(views_values, name)
 
     # Message the user
     try:
-        await client.chat_postMessage(channel='#testreports', blocks=blocks)
+        await pictures_queue.put({"query": query_pic})
+        picture_data = await results_queue.get()
+        await client.chat_postMessage(channel='#bender', blocks=blocks)
+        await get_motivational_picture(client, query_pic, picture_data)
     except Exception as e:
         logger.exception(f"Failed to post a message {e}")
+
 
 
 @app.shortcut("open_modal_report")
@@ -165,90 +186,7 @@ async def open_modal(ack, shortcut, client):
                 "type": "plain_text",
                 "text": "Submit",
             },
-            "blocks": [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "Bender Report\n\n"
-                    }
-                },
-                {
-                    "type": "section",
-                    "block_id": "input_mode",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*How are you today?*"
-                    },
-                    "accessory": {
-                        "type": "static_select",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Select an item",
-                            "emoji": True
-                        },
-                        "options": [
-                            {
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "🙂",
-                                    "emoji": True
-                                },
-                                "value": "value-0"
-                            },
-                            {
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "🙃",
-                                    "emoji": True
-                                },
-                                "value": "value-1"
-                            },
-                            {
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "🫠",
-                                    "emoji": True
-                                },
-                                "value": "value-2"
-                            }
-                        ],
-                        "action_id": "mood_view_id"
-                    }
-                },
-                {
-                    "type": "input",
-                    "block_id": "input_ytd",
-                    "label": {
-                        "type": "plain_text",
-                        "text": "What you done yesterday?"
-                    },
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "yesterday_view_id",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Enter text"
-                        }
-                    }
-                },
-                {
-                    "type": "input",
-                    "block_id": "input_td",
-                    "label": {
-                        "type": "plain_text",
-                        "text": "What you're going do today?"
-                    },
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "today_view_id",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Enter text"
-                        }
-                    }
-                }
-            ]
+            "blocks": REPORT_MODAL
         }
     )
 
@@ -269,82 +207,7 @@ async def leave_modal(ack, shortcut, client):
                 "type": "plain_text",
                 "text": "Submit",
             },
-            "blocks": [
-                {
-                    "type": "section",
-                    "block_id": "input_mode",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*What you're leaving for?*"
-                    },
-                    "accessory": {
-                        "type": "static_select",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Select an item",
-                            "emoji": True
-                        },
-                        "options": [
-                            {
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "Sick 🤧",
-                                    "emoji": True
-                                },
-                                "value": "value-0"
-                            },
-                            {
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "Day off 😎",
-                                    "emoji": True
-                                },
-                                "value": "value-1"
-                            },
-                            {
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "Vacation 🤠",
-                                    "emoji": True
-                                },
-                                "value": "value-2"
-                            }
-                        ],
-                        "action_id": "reason_view_id"
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "How long you're planing be off?"
-                    }
-                },
-                {
-                    "type": "actions",
-                    "block_id": "input_datas",
-                    "elements": [
-                        {
-                            "type": "datepicker",
-                            "initial_date": "1990-04-28",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "From",
-                            },
-                            "action_id": "actionId-0"
-                        },
-                        {
-                            "type": "datepicker",
-                            "initial_date": "1990-04-28",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "To",
-                            },
-                            "action_id": "actionId-1"
-                        }
-                    ]
-                },
-            ]
+            "blocks": LEAVE_MODAL
         }
     )
 

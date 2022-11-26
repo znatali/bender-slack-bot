@@ -49,18 +49,9 @@ def regular_report(views_values,name):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Motivational picture*",
+                "text": "*Motivational picture* - Waaait for it!",
             }
         },
-        {
-            "type": "image",
-            "title": {
-                "type": "plain_text",
-                "text": "I Need a Marg",
-            },
-            "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
-            "alt_text": "marg"
-        }
     ]
 
 
@@ -89,16 +80,7 @@ def leave_report(views_values, name):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Motivational picture*",
+                "text": "*Motivational picture* - Waaait for it!",
             }
         },
-        {
-            "type": "image",
-            "title": {
-                "type": "plain_text",
-                "text": "I Need a Marg",
-            },
-            "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
-            "alt_text": "marg"
-        }
     ]
