@@ -20,7 +20,7 @@ from db.scheme import init_database, get_cursor
 SLACK_TOKEN = os.environ.get('SLACK_TOKEN')
 SIGNING_SECRET = os.environ.get('SIGNING_SECRET')
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 app = AsyncApp(token=SLACK_TOKEN, signing_secret=SIGNING_SECRET)
 app_handler = AsyncSlackRequestHandler(app)
@@ -131,7 +131,7 @@ async def handle_ping_command(ack, respond, command):
     await respond("Pong")
 
 async def get_motivational_picture(client, query, picture_data):
-
+    print("SAVE ANG SHOW")
     await client.files_upload_v2(
         channel='C04C8GQ680N',
         channel_id='C04C8GQ680N',
@@ -163,8 +163,11 @@ async def handle_submission(ack, body, client, view, logger):
     try:
         await pictures_queue.put({"query": query_pic})
         picture_data = await results_queue.get()
+        print("H1")
         await client.chat_postMessage(channel='#bender', blocks=blocks)
+        print("H2")
         await get_motivational_picture(client, query_pic, picture_data)
+        print("H3")
     except Exception as e:
         logger.exception(f"Failed to post a message {e}")
 
