@@ -130,6 +130,7 @@ async def handle_ping_command(ack, respond, command):
     await ack()
     await respond("Pong")
 
+
 async def get_motivational_picture(client, query, picture_data):
     print("SAVE ANG SHOW")
     await client.files_upload_v2(
@@ -140,7 +141,6 @@ async def get_motivational_picture(client, query, picture_data):
         request_file_info=False,
         file=base64.b64decode(picture_data['picture_base64']),
     )
-
 
 
 @app.view("")
@@ -171,7 +171,6 @@ async def handle_submission(ack, body, client, view, logger):
         logger.info("H3")
     except Exception as e:
         logger.exception(f"Failed to post a message {e}")
-
 
 
 @app.shortcut("open_modal_report")

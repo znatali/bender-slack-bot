@@ -10,9 +10,13 @@ SCHEME_QUERIES = [
 
 
 def init_database(path: str, force: bool = False):
-    if not os.path.exists(path) or not force:
-        return
+    if not os.path.exists(path):
+        __execute_create_tables(path)
+    if force:
+        __execute_create_tables(path)
 
+
+def __execute_create_tables(path):
     db = sqlite3.connect(path)
 
     cur = db.cursor()
