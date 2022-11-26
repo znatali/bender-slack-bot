@@ -147,6 +147,7 @@ async def get_motivational_picture(client, query, picture_data):
 async def handle_submission(ack, body, client, view, logger):
     # Assume there's an input block with `input_c` as the block_id and `dreamy_input`
     # Acknowledge the view_submission request and close the modal
+    logger.info("IN VIEW START")
     await ack()
 
     name = body["user"]["name"]
@@ -158,16 +159,16 @@ async def handle_submission(ack, body, client, view, logger):
     else:
         query_pic = views_values['input_td']['today_view_id']['value']
         blocks = regular_report(views_values, name)
-
+    logger.info("GOT BLOCKS")
     # Message the user
     try:
         await pictures_queue.put({"query": query_pic})
         picture_data = await results_queue.get()
-        print("H1")
+        logger.info("H1T")
         await client.chat_postMessage(channel='#bender', blocks=blocks)
-        print("H2")
+        logger.info("H2")
         await get_motivational_picture(client, query_pic, picture_data)
-        print("H3")
+        logger.info("H3")
     except Exception as e:
         logger.exception(f"Failed to post a message {e}")
 
